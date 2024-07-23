@@ -119,7 +119,7 @@ def get_folder():
     if not name or not organization:
         return jsonify({'error': 'Missing name or organization parameter'}), 400
 
-    base_directory = 'warehouse'
+    base_directory = 'WareHouse'
 
     try:
         for folder_name in os.listdir(base_directory):
