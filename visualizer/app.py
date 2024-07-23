@@ -1,9 +1,12 @@
 import logging
 import requests
 import os
-from flask import Flask, send_from_directory, request, jsonify
-import argparse
-
+import subprocess
+import threading
+import shutil
+import tempfile
+from flask import Flask, send_from_directory, request, jsonify, send_file
+import argpars
 app = Flask(__name__, static_folder='static')
 app.logger.setLevel(logging.ERROR)
 log = logging.getLogger('werkzeug')
@@ -58,6 +61,80 @@ def find_avatar_url(role):
     avatar_url = f"/static/{avatar_filename}"
     return avatar_url
 
+@app.route('/run-command', methods=['POST'])
+def run_command():
+    data = request.json
+    description = data.get('description')
+    name = data.get('name')
+
+    if not description or not name:
+        return jsonify({'error': 'Missing description or name parameter'}), 400
+
+    # Set environment variables
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    if not openai_api_key:
+        return jsonify({'error': 'API key not found in environment variables'}), 500
+
+    os.environ['OPENAI_API_KEY'] = openai_api_key
+    os.environ['PYTHONIOENCODING'] = "utf-8"
+
+    # Get the base directory of the project
+# Get the directory containing the Flask app
+    base_directory = os.path.dirname(os.path.abspath(__file__))
+
+    # Get the parent directory of the directory containing run.py
+    parent_directory = os.path.dirname(base_directory)
+
+    # Path to the run.py script
+    run_script_path = os.path.join(parent_directory, 'run.py')
+
+    # Construct the command as a single line
+    command = f'python {run_script_path} --task "{description}" --name "{name}"'
+
+    def execute_command():
+        try:
+            result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=100, cwd=base_directory)
+            output_log = result.stdout
+            error_log = result.stderr
+
+            if result.returncode != 0:
+                print(f'Error: {error_log}')
+            else:
+                print(f'Output: {output_log}')
+        except subprocess.TimeoutExpired:
+            print('The command timed out.')
+        except Exception as e:
+            print(f'Error: {str(e)}')
+
+    command_thread = threading.Thread(target=execute_command)
+    command_thread.start()
+
+    return jsonify({'message': 'Command sent successfully'}), 200
+# Endpoint to handle /get-folder
+@app.route('/get-folder', methods=['GET'])
+def get_folder():
+    name = request.args.get('name')
+    organization = request.args.get('organization')
+
+    if not name or not organization:
+        return jsonify({'error': 'Missing name or organization parameter'}), 400
+
+    base_directory = 'warehouse'
+
+    try:
+        for folder_name in os.listdir(base_directory):
+            if folder_name.startswith(f'{name}_{organization}_') and os.path.isdir(os.path.join(base_directory, folder_name)):
+                folder_path = os.path.join(base_directory, folder_name)
+                folder_path = folder_path.replace('\\', '/')
+                
+                temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+                shutil.make_archive(temp_zip.name[:-4], 'zip', folder_path)
+                
+                return send_file(temp_zip.name, as_attachment=True, download_name=f'{name}_{organization}.zip')
+
+        return jsonify({'error': 'Folder not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='argparse')
