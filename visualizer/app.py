@@ -6,8 +6,12 @@ import threading
 import shutil
 import tempfile
 from flask import Flask, send_from_directory, request, jsonify, send_file
+from flask_cors import CORS
 import argparse
+
 app = Flask(__name__, static_folder='static')
+CORS(app)  # Enable CORS for all routes
+
 app.logger.setLevel(logging.ERROR)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -21,26 +25,21 @@ def send_msg(role, text):
     except:
         logging.info("flask app.py did not start for online log")
 
-
 @app.route("/")
 def index():
     return send_from_directory("static", "index.html")
-
 
 @app.route("/chain_visualizer")
 def chain_visualizer():
     return send_from_directory("static", "chain_visualizer.html")
 
-
 @app.route("/replay")
 def replay():
     return send_from_directory("static", "replay.html")
 
-
 @app.route("/get_messages")
 def get_messages():
     return jsonify(messages)
-
 
 @app.route("/send_message", methods=["POST"])
 def send_message():
@@ -53,7 +52,6 @@ def send_message():
     message = {"role": role, "text": text, "avatarUrl": avatarUrl}
     messages.append(message)
     return jsonify(message)
-
 
 def find_avatar_url(role):
     role = role.replace(" ", "%20")
@@ -79,7 +77,6 @@ def run_command():
     os.environ['PYTHONIOENCODING'] = "utf-8"
 
     # Get the base directory of the project
-# Get the directory containing the Flask app
     base_directory = os.path.dirname(os.path.abspath(__file__))
 
     # Get the parent directory of the directory containing run.py
@@ -110,7 +107,7 @@ def run_command():
     command_thread.start()
 
     return jsonify({'message': 'Command sent successfully'}), 200
-# Endpoint to handle /get-folder
+
 @app.route('/get-folder', methods=['GET'])
 def get_folder():
     name = request.args.get('name')
