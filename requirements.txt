@@ -19,3 +19,4 @@ pyyaml==6.0
 easydict==1.10
 gunicorn==20.1.0
 argparse
+flask-cors
